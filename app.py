@@ -1,72 +1,83 @@
+import pickle
 import streamlit as st
 import numpy as np
-import pickle
 
-# Load the pickled model
-def load_model(model_path):
-    with open(model_path, 'rb') as file:
-        model = pickle.load(file)
-    return model
+# Define function to calculate cosine similarity
+def cosine_similarity(vec1, vec2):
+    """Calculate the cosine similarity between two vectors."""
+    dot_product = np.dot(vec1, vec2)
+    norm_vec1 = np.linalg.norm(vec1)
+    norm_vec2 = np.linalg.norm(vec2)
+    return dot_product / (norm_vec1 * norm_vec2) if norm_vec1 != 0 and norm_vec2 != 0 else 0.0
 
-# Example function to get embedding for a word using a loaded model (GloVe or similar)
-def get_embed(model, word):
-    # Assuming model is a word-to-embedding dictionary (for GloVe, for example)
-    if word in model:
-        return model[word]
-    else:
-        return np.zeros(300)  # Return a zero vector if word not found (300 is common dimension)
-
-# Function to compute the dot product and retrieve top 10 most similar contexts
-def compute_dot_product(query, model, corpus_embeddings):
-    # Get the embedding for the query word
-    query_embedding = get_embed(model, query)
+# Load the embedding dictionaries
+def load_embeddings():
+    pickle_file_path_pos = 'embed_skipgram_positive.pkl'
+    pickle_file_path_neg = 'embed_skipgram_negative.pkl'
+    pickle_file_path_glove = 'embed_glove.pkl'
     
-    # Ensure query_embedding is a valid numpy array with the expected shape
-    if query_embedding is None or query_embedding.shape != (300,):
-        return []
+    with open(pickle_file_path_pos, 'rb') as file:
+        embedding_dict_pos = pickle.load(file)
+    with open(pickle_file_path_neg, 'rb') as file:
+        embedding_dict_neg = pickle.load(file)
+    with open(pickle_file_path_glove, 'rb') as file:
+        embedding_dict_glove = pickle.load(file)
+    
+    return embedding_dict_pos, embedding_dict_neg, embedding_dict_glove
 
-    # Compute dot products for all embeddings in the corpus
+# Function to find next 10 similar words based on cosine similarity
+def find_next_10_cosine_words_for_word(target_word, embedding_dict, top_n=10):
+    if target_word not in embedding_dict:
+        return ["Word not in Corpus"]
+    
+    target_vector = embedding_dict[target_word]
     similarities = []
-    for word, embedding in corpus_embeddings.items():
-        if embedding is None or embedding.shape != (300,):
-            continue  # Skip invalid embeddings
-        similarity = np.dot(query_embedding, embedding)
-        similarities.append((word, similarity))
     
-    # Sort similarities and return the top 10 most similar contexts
+    for word, vector in embedding_dict.items():
+        if word != target_word:  # Skip the target word itself
+            sim = cosine_similarity(target_vector, vector)
+            similarities.append((word, sim))
+    
+    # Sort the words based on similarity (highest first)
     similarities.sort(key=lambda x: x[1], reverse=True)
-    return similarities[:10]
-
-# Streamlit app to handle the user input and display results
-def main():
-    # Load the model (update the path to your actual model)
-    model_path = 'embed_skipgram_negative.pkl'  # Update the path to your pickled model
-    model = load_model(model_path)
-
-    # For simplicity, assume we have a corpus of words already embedded
-    corpus_embeddings = {word: get_embed(model, word) for word in model.keys()}  # Example corpus
     
-    # Title of the app
-    st.title("Search Similar Contexts")
+    # Return the top N similar words
+    return [word for word, _ in similarities[:top_n]]
 
-    # Input box for query
-    query = st.text_input("Enter a word or query:", "")
+# Streamlit app interface
+def main():
+    # Load embeddings at the start
+    embedding_dict_pos, embedding_dict_neg, embedding_dict_glove = load_embeddings()
 
-    # Display a message if no query is entered
-    if query:
-        top_10_similar = compute_dot_product(query, model, corpus_embeddings)
-        
-        # Display results
-        if top_10_similar:
-            st.write(f"Top 10 Similar Contexts for: **{query}**")
-            
-            # Show results as a table
-            result_data = [{"Word": word, "Similarity": similarity} for word, similarity in top_10_similar]
-            st.table(result_data)
-        else:
-            st.write("No similar contexts found.")
-    else:
-        st.write("Please enter a query to search for similar contexts.")
+    # Set up the Streamlit app title and description
+    st.title("Word Similarity Search")
+    st.write("Enter a word to find the next 10 most similar words based on cosine similarity.")
+
+    # Get user input for the target word
+    user_target_word = st.text_input("Enter a word to search:", "run")  # Default word is "run"
+
+    # Select the embedding model to use
+    model_choice = st.selectbox("Select Embedding Model", ["GloVe", "Skipgram Positive", "Skipgram Negative"])
+
+    # Based on the model choice, select the appropriate embedding dictionary
+    if model_choice == "GloVe":
+        embedding_dict = embedding_dict_glove
+    elif model_choice == "Skipgram Positive":
+        embedding_dict = embedding_dict_pos
+    elif model_choice == "Skipgram Negative":
+        embedding_dict = embedding_dict_neg
+
+    # If the user entered a word, compute the top 10 similar words
+    if user_target_word:
+        with st.spinner('Finding similar words...'):
+            next_10_cosine_for_user_word = find_next_10_cosine_words_for_word(user_target_word, embedding_dict, top_n=10)
+
+            # Display results
+            if next_10_cosine_for_user_word == ["Word not in Corpus"]:
+                st.error("Word not in Corpus")
+            else:
+                st.success(f"Top 10 similar words for '{user_target_word}':")
+                st.write(next_10_cosine_for_user_word)
 
 if __name__ == "__main__":
     main()
