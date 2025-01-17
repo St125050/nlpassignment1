@@ -1,0 +1,15 @@
+# Ignore Python bytecode files
+__pycache__
+*.pyc
+*.pyo
+
+# Ignore virtual environment directories
+venv/
+env/
+*.egg-info/
+
+# Ignore the model file (if you want to load it separately or don't want it in the image)
+embed_glove.pkl
+
+# Ignore Git files
+.git/
