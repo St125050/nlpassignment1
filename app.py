@@ -1,6 +1,6 @@
 import pickle
-import streamlit as st
 import numpy as np
+import streamlit as st
 
 # Define function to calculate cosine similarity
 def cosine_similarity(vec1, vec2):
@@ -9,6 +9,11 @@ def cosine_similarity(vec1, vec2):
     norm_vec1 = np.linalg.norm(vec1)
     norm_vec2 = np.linalg.norm(vec2)
     return dot_product / (norm_vec1 * norm_vec2) if norm_vec1 != 0 and norm_vec2 != 0 else 0.0
+
+# Define function to calculate dot product
+def dot_product(vec1, vec2):
+    """Calculate the dot product between two vectors."""
+    return np.dot(vec1, vec2)
 
 # Load the embedding dictionaries
 def load_embeddings():
@@ -25,8 +30,8 @@ def load_embeddings():
     
     return embedding_dict_pos, embedding_dict_neg, embedding_dict_glove
 
-# Function to find next 10 similar words based on cosine similarity
-def find_next_10_cosine_words_for_word(target_word, embedding_dict, top_n=10):
+# Function to find next 10 similar words based on cosine similarity or dot product
+def find_next_10_similar_words_for_word(target_word, embedding_dict, similarity_function, top_n=10):
     if target_word not in embedding_dict:
         return ["Word not in Corpus"]
     
@@ -35,7 +40,7 @@ def find_next_10_cosine_words_for_word(target_word, embedding_dict, top_n=10):
     
     for word, vector in embedding_dict.items():
         if word != target_word:  # Skip the target word itself
-            sim = cosine_similarity(target_vector, vector)
+            sim = similarity_function(target_vector, vector)  # Use chosen similarity function
             similarities.append((word, sim))
     
     # Sort the words based on similarity (highest first)
@@ -51,13 +56,16 @@ def main():
 
     # Set up the Streamlit app title and description
     st.title("Word Similarity Search")
-    st.write("Enter a word to find the next 10 most similar words based on cosine similarity.")
+    st.write("Enter a word to find the next 10 most similar words based on the selected similarity measure (Cosine Similarity or Dot Product).")
 
     # Get user input for the target word
     user_target_word = st.text_input("Enter a word to search:", "run")  # Default word is "run"
 
     # Select the embedding model to use
     model_choice = st.selectbox("Select Embedding Model", ["GloVe", "Skipgram Positive", "Skipgram Negative"])
+
+    # Select the similarity method to use
+    similarity_method = st.radio("Select Similarity Method", ("Cosine Similarity", "Dot Product"))
 
     # Based on the model choice, select the appropriate embedding dictionary
     if model_choice == "GloVe":
@@ -67,17 +75,23 @@ def main():
     elif model_choice == "Skipgram Negative":
         embedding_dict = embedding_dict_neg
 
+    # Select the appropriate similarity function
+    if similarity_method == "Cosine Similarity":
+        similarity_function = cosine_similarity
+    else:
+        similarity_function = dot_product
+
     # If the user entered a word, compute the top 10 similar words
     if user_target_word:
         with st.spinner('Finding similar words...'):
-            next_10_cosine_for_user_word = find_next_10_cosine_words_for_word(user_target_word, embedding_dict, top_n=10)
+            next_10_similar_for_user_word = find_next_10_similar_words_for_word(user_target_word, embedding_dict, similarity_function, top_n=10)
 
             # Display results
-            if next_10_cosine_for_user_word == ["Word not in Corpus"]:
+            if next_10_similar_for_user_word == ["Word not in Corpus"]:
                 st.error("Word not in Corpus")
             else:
-                st.success(f"Top 10 similar words for '{user_target_word}':")
-                st.write(next_10_cosine_for_user_word)
+                st.success(f"Top 10 similar words for '{user_target_word}' using {similarity_method}:")
+                st.write(next_10_similar_for_user_word)
 
 if __name__ == "__main__":
     main()
