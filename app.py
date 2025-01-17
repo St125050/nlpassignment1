@@ -40,7 +40,7 @@ def compute_dot_product(query, model, corpus_embeddings):
 # Streamlit app to handle the user input and display results
 def main():
     # Load the model (update the path to your actual model)
-    model_path = 'embed_glove.pkl'  # Update the path to your pickled model
+    model_path = 'embed_skipgram_negative.pkl'  # Update the path to your pickled model
     model = load_model(model_path)
 
     # For simplicity, assume we have a corpus of words already embedded
